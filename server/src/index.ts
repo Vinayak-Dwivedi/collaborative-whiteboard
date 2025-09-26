@@ -11,11 +11,13 @@ app.use(cors()); // Use cors middleware
 const server = http.createServer(app);
 
 // Initialize Socket.IO server with CORS configuration
+// server/src/index.ts
+
 const io = new Server(server, {
   cors: {
-    origin: "http://localhost:5173", // Your client's URL
-    methods: ["GET", "POST"],
-  },
+    origin: ["https://vinay-whiteboard.netlify.app", "http://localhost:5173"], // Allow both origins
+    methods: ["GET", "POST"]
+  }
 });
 
 // Listen for new connections
