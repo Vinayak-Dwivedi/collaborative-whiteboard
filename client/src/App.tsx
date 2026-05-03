@@ -4,16 +4,59 @@ import { io } from "socket.io-client";
 import Canvas from "./components/Canvas";
 import Toolbar from "./components/Toolbar";
 
+type Tool =
+  | "pen"
+  | "pencil"
+  | "sketchPen"
+  | "eraser"
+  | "circle"
+  | "rectangle"
+  | "triangle"
+  | "line"
+  | "select";
+
 const serverUrl = import.meta.env.VITE_SERVER_URL || "http://localhost:3001";
 const socket = io(serverUrl);
 
 function App() {
   const [color, setColor] = useState("#000000");
   const [lineWidth, setLineWidth] = useState(3);
-  const [tool, setTool] = useState<"pen" | "eraser">("pen");
+  const [tool, setTool] = useState<Tool>("pen");
+  const [history, setHistory] = useState<ImageData[]>([]);
+  const [historyStep, setHistoryStep] = useState(-1);
+  const [currentPage, setCurrentPage] = useState(0);
+  const maxPages = 10;
 
   const handleClearCanvas = () => {
     socket.emit("clearCanvas");
+  };
+
+  const handleUndo = () => {
+    if (historyStep > 0) {
+      const newStep = historyStep - 1;
+      setHistoryStep(newStep);
+      // This would restore the canvas state
+    }
+  };
+
+  const handleRedo = () => {
+    if (historyStep < history.length - 1) {
+      const newStep = historyStep + 1;
+      setHistoryStep(newStep);
+      // This would restore the canvas state
+    }
+  };
+
+  const handleNextPage = () => {
+    setCurrentPage((prev) => Math.min(prev + 1, maxPages - 1));
+  };
+
+  const handlePreviousPage = () => {
+    setCurrentPage((prev) => Math.max(prev - 1, 0));
+  };
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
   };
 
   const AnimatedHeading = () => (
@@ -43,6 +86,12 @@ function App() {
             color={color}
             lineWidth={lineWidth}
             tool={tool}
+            onUndo={handleUndo}
+            onRedo={handleRedo}
+            canUndo={historyStep > 0}
+            canRedo={historyStep < history.length - 1}
+            currentPage={currentPage}
+            onPageChange={handlePageChange}
           />
         </div>
         <Toolbar
@@ -53,6 +102,14 @@ function App() {
           tool={tool}
           setTool={setTool}
           handleClearCanvas={handleClearCanvas}
+          onUndo={handleUndo}
+          onRedo={handleRedo}
+          canUndo={historyStep > 0}
+          canRedo={historyStep < history.length - 1}
+          currentPage={currentPage}
+          onNextPage={handleNextPage}
+          onPreviousPage={handlePreviousPage}
+          maxPages={maxPages}
         />
       </div>
     </div>
