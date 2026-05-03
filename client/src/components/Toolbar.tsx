@@ -43,8 +43,6 @@ const Toolbar: React.FC<ToolbarProps> = ({
   canUndo,
   canRedo,
   currentPage = 0,
-  onNextPage,
-  onPreviousPage,
   maxPages = 10,
 }) => {
   return (
