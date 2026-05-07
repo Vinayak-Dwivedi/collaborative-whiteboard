@@ -43,6 +43,8 @@ const Toolbar: React.FC<ToolbarProps> = ({
   canUndo,
   canRedo,
   currentPage = 0,
+  onNextPage,
+  onPreviousPage,
   maxPages = 10,
 }) => {
   return (
@@ -186,14 +188,14 @@ const Toolbar: React.FC<ToolbarProps> = ({
         </div>
         <div className="button-grid">
           <button
-            onClick={() => (window as any).goToPreviousPage?.()}
+            onClick={onPreviousPage}
             disabled={currentPage === 0}
             className={`tool-button ${currentPage === 0 ? "disabled" : ""}`}
           >
             Previous
           </button>
           <button
-            onClick={() => (window as any).goToNextPage?.()}
+            onClick={onNextPage}
             disabled={currentPage === maxPages - 1}
             className={`tool-button ${currentPage === maxPages - 1 ? "disabled" : ""}`}
           >

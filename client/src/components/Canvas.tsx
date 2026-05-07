@@ -1,6 +1,6 @@
 // client/src/components/Canvas.tsx
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState, useCallback } from "react";
 import { Socket } from "socket.io-client";
 
 type Tool =
@@ -70,10 +70,20 @@ const Canvas: React.FC<CanvasProps> = ({
   const drawingHistoryRef = useRef<ImageData[]>([]);
   const historyStepRef = useRef<number>(-1);
   const pagesRef = useRef<ImageData[]>([]);
-  const maxPages = 10;
+
+  // Save current page state
+  const saveCurrentPage = useCallback(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    pagesRef.current[currentPage] = imageData;
+  }, [currentPage]);
 
   // Function to clear the canvas
-  const clearCanvas = () => {
+  const clearCanvas = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
@@ -83,53 +93,34 @@ const Canvas: React.FC<CanvasProps> = ({
     saveCurrentPage();
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     socket.emit("clearCanvas");
-  };
-
-  // Save current page state
-  const saveCurrentPage = () => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
-    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    pagesRef.current[currentPage] = imageData;
-  };
+  }, [socket, saveCurrentPage]); // Removed currentPage dependency
 
   // Load page state
-  const loadPage = (pageNumber: number) => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
+  const loadPage = useCallback(
+    (pageNumber: number) => {
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
 
-    saveCurrentPage();
+      saveCurrentPage();
 
-    if (pagesRef.current[pageNumber]) {
-      ctx.putImageData(pagesRef.current[pageNumber], 0, 0);
-    } else {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-    }
+      if (pagesRef.current[pageNumber]) {
+        ctx.putImageData(pagesRef.current[pageNumber], 0, 0);
+      } else {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+      }
 
-    if (onPageChange) {
-      onPageChange(pageNumber);
-    }
-  };
+      if (onPageChange) {
+        onPageChange(pageNumber);
+      }
+    },
+    [onPageChange, saveCurrentPage],
+  );
 
-  // Go to next page
-  const goToNextPage = () => {
-    const nextPage = Math.min(currentPage + 1, maxPages - 1);
-    loadPage(nextPage);
-  };
-
-  // Go to previous page
-  const goToPreviousPage = () => {
-    const prevPage = Math.max(currentPage - 1, 0);
-    loadPage(prevPage);
-  };
 
   // Function to draw a line with smooth interpolation
-  const drawLine = (data: DrawData) => {
+  const drawLine = useCallback((data: DrawData) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
@@ -165,10 +156,10 @@ const Canvas: React.FC<CanvasProps> = ({
     // Reset styles
     ctx.globalAlpha = 1.0;
     ctx.setLineDash([]);
-  };
+  }, []);
 
   // Function to draw shapes
-  const drawShape = (data: ShapeData) => {
+  const drawShape = useCallback((data: ShapeData) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
@@ -185,12 +176,13 @@ const Canvas: React.FC<CanvasProps> = ({
     ctx.beginPath();
 
     switch (data.tool) {
-      case "circle":
+      case "circle": {
         const radius = Math.sqrt(width * width + height * height) / 2;
         const centerX = data.startX + width / 2;
         const centerY = data.startY + height / 2;
         ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI);
         break;
+      }
       case "rectangle":
         ctx.rect(data.startX, data.startY, width, height);
         break;
@@ -208,10 +200,10 @@ const Canvas: React.FC<CanvasProps> = ({
 
     ctx.stroke();
     ctx.globalAlpha = 1.0;
-  };
+  }, []);
 
   // Save canvas state for undo/redo
-  const saveCanvasState = () => {
+  const saveCanvasState = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
@@ -229,9 +221,9 @@ const Canvas: React.FC<CanvasProps> = ({
       drawingHistoryRef.current.shift();
       historyStepRef.current -= 1;
     }
-  };
+  }, []);
 
-  // Keyboard shortcuts for undo/redo and expose page navigation methods
+  // Keyboard shortcuts for undo/redo
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.ctrlKey || e.metaKey) {
@@ -245,22 +237,16 @@ const Canvas: React.FC<CanvasProps> = ({
       }
     };
 
-    // Expose page navigation methods globally for toolbar buttons
-    (window as any).goToNextPage = goToNextPage;
-    (window as any).goToPreviousPage = goToPreviousPage;
-
     window.addEventListener("keydown", handleKeyDown);
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
-      delete (window as any).goToNextPage;
-      delete (window as any).goToPreviousPage;
     };
-  }, [onUndo, onRedo, canUndo, canRedo, currentPage]);
+  }, [onUndo, onRedo, canUndo, canRedo]);
 
   // Initialize page on mount
   useEffect(() => {
     loadPage(currentPage);
-  }, [currentPage]);
+  }, [currentPage, loadPage]);
 
   // Effect for handling socket events
   useEffect(() => {
@@ -281,7 +267,7 @@ const Canvas: React.FC<CanvasProps> = ({
       socket.off("drawShape");
       socket.off("clearCanvas");
     };
-  }, [socket]); // Dependency array includes socket
+  }, [socket, drawLine, drawShape, clearCanvas]); // Dependency array includes socket and callbacks
 
   const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const { offsetX, offsetY } = e.nativeEvent;

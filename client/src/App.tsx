@@ -22,7 +22,7 @@ function App() {
   const [color, setColor] = useState("#000000");
   const [lineWidth, setLineWidth] = useState(3);
   const [tool, setTool] = useState<Tool>("pen");
-  const [history, setHistory] = useState<ImageData[]>([]);
+  const [history] = useState<ImageData[]>([]);
   const [historyStep, setHistoryStep] = useState(-1);
   const [currentPage, setCurrentPage] = useState(0);
   const maxPages = 10;
